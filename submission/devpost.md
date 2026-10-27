@@ -15,7 +15,7 @@ An agent that finds the cities that love your work but aren't getting enough of 
 
 Most acts route tours on instinct and a spreadsheet. The big markets are obvious, and so is the problem with them: everyone plays them. The useful question is harder. Which cities love work like yours, and *aren't getting enough of it*?
 
-An LLM can guess that an Afrobeats star should play London. It can't tell you that the same artist's audience in London is already being courted by Omah Lay and Adekunle Gold in the same month, or that Washington and Atlanta sit in the top 15% of places for that audience with almost nothing booked. That needs two things no model has on its own: real taste data and real listings.
+An LLM can guess that an Afrobeats star should play London. It can't tell you that the same artist's audience in London is already being courted by Omah Lay and Adekunle Gold in the same month, or that Washington and Atlanta sit around the top 15% of places for that audience with none of those acts booked there. That needs two things no model has on its own: real taste data and real listings.
 
 ## What it does
 
@@ -60,6 +60,7 @@ The stack is a Node 24 server running TypeScript directly, React and Vite, and L
 - **"Washington" is a state.** Location searches by name sent Washington, D.C. to Washington State, and Birmingham could be Alabama. Every city now goes to Qloo as coordinates. The agent caught this one itself: it flagged in its own cautions that DC's venues pointed to Seattle.
 - **A zero that means nothing.** Ticketmaster returns zero events for all of Paris. Without a coverage check, Paris looked like the most underserved city in Europe.
 - **People are not all comedians.** Qloo's person graph for Ali Wong surfaces finance creators and parenting accounts. Filtering by her occupation tag (`urn:tag:occupation:person:comedian`) turns that into Phoebe Robinson, Maya Rudolph and Naomi Ekperigin.
+- **Documented isn't always deployed.** Games are `urn:entity:videogame` in the API, not `video_game` as documented. A world heatmap signalled by one restaurant times out after a minute, so restaurants signal by their `genre:place:restaurant:*` tags instead (cuisine and style tags return no cells).
 - **"Comparable" is a taste question.** Ticketmaster's genre filter counted cumbia nights against an Afrobeats artist. Using Qloo's related acts to define the same crowd made supply mean something.
 
 ## Accomplishments that I'm proud of

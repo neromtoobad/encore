@@ -61,7 +61,7 @@ function toEntity(x: Raw, kind: Kind): Entity {
     image: p.image?.url ?? undefined,
     blurb: p.short_description ?? p.description ?? undefined,
     popularity: typeof x.popularity === 'number' ? x.popularity : undefined,
-    tags: toTags(x.tags).slice(0, 14),
+    tags: toTags(x.tags).slice(0, 40), // the signals below need the cuisine and occupation tags, which come late
     source: 'qloo',
   }
 }
@@ -126,6 +126,23 @@ const WORLD = 'POLYGON((-130 -40, 60 -40, 60 62, -130 62, -130 -40))'
 
 export type Demand = { affinity: number; percentile: number }
 
+// A heatmap signalled by a single restaurant makes Qloo time out (504 after a
+// minute), so places signal by restaurant genre tags instead. Only
+// urn:tag:genre:place:restaurant:* tags register on a heatmap (cuisine and
+// culinary_style tags return no cells), so those are mapped across by name:
+// culinary_style:qloo:fine_dining → genre:place:restaurant:fine_dining.
+function heatSignal(e: Entity): Record<string, string> {
+  if (e.qlooType === 'urn:entity:place') {
+    const direct = e.tags.filter((t) => t.id.startsWith('urn:tag:genre:place:restaurant:')).map((t) => t.id)
+    const mapped = e.tags
+      .filter((t) => /^urn:tag:(cuisine|culinary_style):qloo:/.test(t.id))
+      .map((t) => `urn:tag:genre:place:restaurant:${t.id.split(':').pop()}`)
+    const tags = [...new Set([...direct, ...mapped])].slice(0, 4)
+    if (tags.length) return { 'signal.interests.tags': tags.join(','), 'operator.signal.interests.tags': 'union' }
+  }
+  return { 'signal.interests.entities': e.id }
+}
+
 export async function marketAffinity(e: Entity, markets: Market[]): Promise<Map<string, Demand>> {
   const out = new Map<string, Demand>()
   if (e.source === 'demo') {
@@ -135,7 +152,7 @@ export async function marketAffinity(e: Entity, markets: Market[]): Promise<Map<
     }
     return out
   }
-  const r = await insights({ 'filter.type': 'urn:heatmap', 'filter.location': WORLD, 'output.heatmap.boundary': 'urn:geohash', 'signal.interests.entities': e.id })
+  const r = await insights({ 'filter.type': 'urn:heatmap', 'filter.location': WORLD, 'output.heatmap.boundary': 'urn:geohash', ...heatSignal(e) })
   const cells = ((r.results?.heatmap ?? []) as Raw[])
     .map((p) => ({ lat: Number(p.location?.latitude), lng: Number(p.location?.longitude), affinity: Number(p.query?.affinity ?? 0), rank: Number(p.query?.affinity_rank ?? 0) }))
     .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng))
@@ -159,7 +176,7 @@ const point = (mk: Market) => `POINT(${mk.lng} ${mk.lat})`
 const inCity = (mk: Market) => ({ 'filter.location': point(mk), 'filter.location.radius': 35_000 })
 
 async function cityHeat(e: Entity, mk: Market): Promise<Spot[]> {
-  const r = await insights({ 'filter.type': 'urn:heatmap', ...inCity(mk), 'signal.interests.entities': e.id })
+  const r = await insights({ 'filter.type': 'urn:heatmap', ...inCity(mk), ...heatSignal(e) })
   const pts: Raw[] = r.results?.heatmap ?? []
   return pts
     .map((p) => ({ lat: Number(p.location?.latitude), lng: Number(p.location?.longitude), geohash: p.location?.geohash, affinity: Number(p.query?.affinity ?? 0) }))

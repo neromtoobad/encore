@@ -8,7 +8,7 @@ export const KINDS: { id: Kind; label: string; noun: string; examples: string[] 
   { id: 'brand', label: 'Brand pop-up', noun: 'a brand', examples: ['Telfar', 'Aimé Leon Dore'] },
   { id: 'film', label: 'Film', noun: 'a film', examples: ['Anikulapo', 'Everything Everywhere All at Once'] },
   { id: 'game', label: 'Game', noun: 'a game', examples: ['Hades', 'Stardew Valley'] },
-  { id: 'chef', label: 'Chef', noun: 'a restaurant', examples: ['Ikoyi', 'Momofuku'] },
+  { id: 'chef', label: 'Chef', noun: 'a restaurant', examples: ['Ikoyi Restaurant', 'Momofuku'] },
 ]
 
 export const kindLabel = (k: Kind) => KINDS.find((x) => x.id === k)?.label ?? k

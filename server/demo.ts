@@ -28,7 +28,7 @@ const QLOO_TYPE: Record<Kind, string> = {
   podcast: 'urn:entity:podcast',
   brand: 'urn:entity:brand',
   film: 'urn:entity:movie',
-  game: 'urn:entity:video_game',
+  game: 'urn:entity:videogame', // the docs say video_game; the API only accepts videogame
   chef: 'urn:entity:place',
 }
 export const qlooTypeOf = (k: Kind) => QLOO_TYPE[k]
@@ -65,7 +65,7 @@ const CATALOGUE: Seed[] = [
   ['Anikulapo', 'film', ['nollywood', 'drama', 'nigerian'], 'Yoruba-language epic.'],
   ['Hades', 'game', ['indie games', 'roguelike', 'gaming'], 'Supergiant roguelike.'],
   ['Stardew Valley', 'game', ['cozy games', 'indie games', 'gaming'], 'Farming sim.'],
-  ['Ikoyi', 'chef', ['west african', 'fine dining', 'food'], 'London restaurant, West African spice.'],
+  ['Ikoyi Restaurant', 'chef', ['west african', 'fine dining', 'food'], 'London restaurant, West African spice.'],
   ['Momofuku', 'chef', ['korean american', 'food', 'casual dining'], 'New York restaurant group.'],
 ]
 

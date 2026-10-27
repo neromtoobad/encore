@@ -161,5 +161,32 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Encore on http://localhost:${PORT}  (qloo: ${qlooLive() ? 'live' : 'demo'}, ticketmaster: ${ticketmasterLive() ? 'live' : 'demo'}, agent: ${agentLive() ? 'claude' : 'rules'})`)
-  warmCoverage(MARKETS).catch((err) => console.warn('[supply] coverage warm-up failed:', (err as Error).message))
+  warmCoverage(MARKETS)
+    .then(() => warmExamples())
+    .catch((err) => console.warn('[warm] failed:', (err as Error).message))
 })
+
+// The acts the hero page suggests, scanned once at startup so a visitor's first
+// click isn't a cold 20-second wait. One at a time, to stay inside rate limits.
+const EXAMPLES: [Kind, string][] = [
+  ['artist', 'Asake'],
+  ['artist', 'Khruangbin'],
+  ['artist', 'Zach Bryan'],
+  ['comedian', 'Ali Wong'],
+  ['comedian', 'Basketmouth'],
+  ['podcast', 'Morbid'],
+  ['podcast', 'Call Her Daddy'],
+]
+
+async function warmExamples() {
+  if (!qlooLive()) return
+  for (const [kind, name] of EXAMPLES) {
+    try {
+      const [e] = await search(name, kind)
+      if (e) await scanFor(e.id, kind, 'all')
+    } catch (err) {
+      console.warn(`[warm] ${name}: ${(err as Error).message}`)
+    }
+  }
+  console.log(`[warm] scanned ${EXAMPLES.length} example acts`)
+}

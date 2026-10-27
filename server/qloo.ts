@@ -103,9 +103,19 @@ export async function entity(id: string, kind: Kind): Promise<Entity | undefined
   return e
 }
 
+// Qloo's person graph mixes every kind of public figure: Ali Wong's nearest
+// "people" are finance creators and parenting accounts. Keep person results to
+// the act's own occupation (comedian for comedians).
+export function sameKind(e: Entity): Record<string, string> {
+  if (e.qlooType !== 'urn:entity:person') return {}
+  const jobs = e.tags.filter((t) => t.id.startsWith('urn:tag:occupation:person:'))
+  const job = (e.kind === 'comedian' && jobs.find((t) => t.id.endsWith(':comedian'))) || jobs[0]
+  return job ? { 'filter.tags': job.id } : e.kind === 'comedian' ? { 'filter.tags': 'urn:tag:occupation:person:comedian' } : {}
+}
+
 export async function related(e: Entity, n = 8): Promise<Pick[]> {
   if (e.source === 'demo') return demoRelated(e, n)
-  const r = await insights({ 'filter.type': e.qlooType, 'signal.interests.entities': e.id, take: n + 1 })
+  const r = await insights({ 'filter.type': e.qlooType, 'signal.interests.entities': e.id, ...sameKind(e), take: n + 1 })
   return entities(r).map(toPick).filter((p) => p.id !== e.id).slice(0, n)
 }
 
@@ -157,12 +167,11 @@ async function cityHeat(e: Entity, mk: Market): Promise<Spot[]> {
 }
 
 // Tag searches for the kind of room each kind of act plays, and for partners.
-// The first tag is tried first; the rest top the list up when it comes back short.
 const VENUE_TAGS: Record<Kind, string[]> = {
   artist: ['music venue', 'concert hall', 'nightclub'],
-  comedian: ['comedy club', 'theater'],
+  comedian: ['comedy club', 'performing arts theater', 'concert hall'],
   author: ['bookstore', 'library'],
-  podcast: ['theater', 'music venue'],
+  podcast: ['performing arts theater', 'music venue'],
   brand: ['boutique', 'art gallery'],
   film: ['movie theater'],
   game: ['arcade', 'bar'],
@@ -188,12 +197,16 @@ async function places(e: Entity, mk: Market, tagQuery: string, n: number): Promi
   return entities(r).map(toPick)
 }
 
+// A few rooms of each type (clubs and theatres, say), so a brief asking for
+// 2,000 seats has something to choose from; any shortfall is filled in order.
 async function venuesFor(e: Entity, mk: Market, n: number): Promise<Pick[]> {
+  const tags = VENUE_TAGS[e.kind]
+  const lists = await Promise.all(tags.map((tag) => places(e, mk, tag, n).catch(() => [] as Pick[])))
   const out: Pick[] = []
-  for (const tag of VENUE_TAGS[e.kind]) {
-    if (out.length >= 4) break
-    for (const p of await places(e, mk, tag, n).catch(() => [])) if (!out.some((x) => x.id === p.id)) out.push(p)
-  }
+  const add = (p: Pick) => !out.some((x) => x.id === p.id) && out.push(p)
+  const each = Math.ceil(n / tags.length)
+  for (const list of lists) list.slice(0, each).forEach(add)
+  for (const list of lists) for (const p of list) if (out.length < n) add(p)
   return out.slice(0, n)
 }
 
@@ -201,7 +214,7 @@ async function venuesFor(e: Entity, mk: Market, n: number): Promise<Pick[]> {
 // slot, not a co-headliner. Widens if the cap leaves too few. (Weighting this to
 // the city pulled in local acts from other genres, so it isn't.)
 async function openersFor(e: Entity): Promise<Pick[]> {
-  const base = { 'filter.type': e.qlooType, 'signal.interests.entities': e.id, take: 8 }
+  const base = { 'filter.type': e.qlooType, 'signal.interests.entities': e.id, ...sameKind(e), take: 8 }
   const cap = e.popularity !== undefined ? Math.min(0.97, e.popularity) : undefined
   let r = cap !== undefined ? await insights({ ...base, 'filter.popularity.max': cap.toFixed(3) }).catch(() => null) : null
   if (!r || entities(r).length < 3) r = await insights(base)

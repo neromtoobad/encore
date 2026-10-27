@@ -41,14 +41,17 @@ function detailForModel(d: CityDetail, row?: MarketScore) {
   return {
     market: `${d.market.name}, ${d.market.country} (${d.market.id})`,
     data: d.source === 'demo' ? 'DEMO DATA: names below are placeholders, not real venues or people' : 'live Qloo data',
-    score: row && { whitespace: row.whitespace, verdict: row.verdict, index: Number(row.index.toFixed(2)), why: row.why },
+    score: row && { whitespace: row.whitespace, verdict: row.verdict, demand_percentile: Number(row.percentile.toFixed(3)), index: Number(row.index.toFixed(2)), why: row.why },
     hottest_areas: hot,
     venues: names(d.venues),
     openers: names(d.openers),
     partners: names(d.partners),
     audience: d.audience?.age.map((a) => `${a.label} ${(a.share * 100).toFixed(0)}%`).join(', ') ?? 'unknown',
-    booked: d.supply.count === null ? 'no listing data' : `${d.supply.count} comparable shows in the next 90 days`,
-    booked_dates: d.supply.listings.filter((l) => !l.sample).map((l) => `${l.date}: ${l.name} at ${l.venue}`),
+    booked:
+      d.supply.count === null
+        ? 'no listing data'
+        : `${d.supply.count} genre shows in the next 90 days${d.supply.crowd !== null ? `; ${d.supply.crowd} by acts this audience loves${d.supply.self ? `, ${d.supply.self} by the act itself` : ''}` : ''}`,
+    booked_dates: d.supply.listings.filter((l) => !l.sample).map((l) => `${l.date}: ${l.name} at ${l.venue}${l.act ? ` [${l.self ? 'THIS ACT' : `same crowd: ${l.act}`}]` : ''}`),
   }
 }
 
@@ -134,7 +137,7 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
 
 const SYSTEM = `You are Encore, a booking strategist for anyone who takes their work on the road: musicians, comedians, authors, podcasters, brands doing pop-ups, film screenings, game events, chefs.
 
-You plan runs from evidence. The scan you receive ranks markets by a whitespace score: Qloo's measure of how much this audience over-indexes on a city (demand), discounted by how many comparable shows Ticketmaster already lists there in the next 90 days (supply). "Underserved" means high demand and few comparable shows. "Unlisted" means there is no listing data, so supply is unknown; say so rather than calling it underserved.
+You plan runs from evidence. The scan you receive ranks markets by a whitespace score: Qloo's measure of how much this audience over-indexes on a city (demand, as a percentile of all places Qloo maps), discounted by what Ticketmaster already lists there in the next 90 days (supply): shows in the matching genre, plus "same-crowd" shows by acts this audience loves, which compete directly for the same people. "Underserved" means high demand and little booked. "Unlisted" means there is no listing data, so supply is unknown; say so rather than calling it underserved. Avoid dates near a same-crowd show in the same city, and never book a city the act is already playing in the window.
 
 How to work:
 - Read the user's brief and follow it: number of dates, region, start city, timing, room size.
@@ -147,7 +150,7 @@ How to work:
 
 function briefMessage(scan: Scan, brief: string, start: string) {
   const rows = scan.markets.slice(0, 18).map((r) =>
-    `${r.market.id} | ${r.market.name} | whitespace ${r.whitespace} | ${r.verdict} | demand ${r.index.toFixed(2)}x | ${r.supply.count === null ? 'no listings data' : `${r.supply.count} booked (${(r.supply.perMillion ?? 0).toFixed(1)}/M)`}`,
+    `${r.market.id} | ${r.market.name} | whitespace ${r.whitespace} | ${r.verdict} | demand top ${Math.max(1, Math.round((1 - r.percentile) * 100))}% of places (${r.index.toFixed(2)}x avg market) | ${r.supply.count === null ? 'no listings data' : `${r.supply.count} genre shows (${(r.supply.perMillion ?? 0).toFixed(1)}/M)${r.supply.crowd ? `, ${r.supply.crowd} same-crowd` : ''}${r.supply.self ? `, ${r.supply.self} by this act` : ''}`}`,
   )
   return [
     `Entity: ${scan.entity.name} (${scan.entity.kind}). ${scan.profile.summary}`,
@@ -265,7 +268,7 @@ async function* planWithRules(ctx: Ctx, brief: string, start: string): AsyncGene
         market_id: s.market.id,
         to: `Booker, ${venue}`,
         subject: `${name} in ${s.market.name}, ${s.date}?`,
-        body: `Hi,\n\nWe're routing ${name} and ${s.market.name} is high on the list: the audience's affinity there is ${row?.index.toFixed(1) ?? '1.0'}× the average market${row?.supply.count != null ? `, and only ${row.supply.count} comparable shows are booked in the next 90 days` : ''}. We'd love to hold ${s.date} (or nearby) at ${venue}.\n\nCan you share avails and terms?\n\nThanks`,
+        body: `Hi,\n\nWe're routing ${name} and ${s.market.name} is high on the list: Qloo puts the audience's affinity there in the top ${Math.max(1, Math.round((1 - (row?.percentile ?? 0.5)) * 100))}% of places${row?.supply.count != null ? `, and only ${row.supply.count} comparable shows are booked in the next 90 days` : ''}. We'd love to hold ${s.date} (or nearby) at ${venue}.\n\nCan you share avails and terms?\n\nThanks`,
       }
     }),
     posters: stops.map((s) => ({ market_id: s.market.id, line: `${name} · ${s.market.name} · ${new Date(s.date + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })}` })),

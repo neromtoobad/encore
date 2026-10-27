@@ -33,12 +33,17 @@ export type Market = {
   ticketmaster: boolean // whether Discovery API covers this country
 }
 
-export type Listing = { name: string; date: string; venue: string; url?: string; sample?: boolean }
+// act: which of the audience's acts it is; self: the act being scanned.
+export type Listing = { name: string; date: string; venue: string; url?: string; sample?: boolean; act?: string; self?: boolean }
 
 export type Supply = {
-  count: number | null // null: no listing data for this market
+  count: number | null // shows in the matching genre; null: no listing data for this market
   perMillion: number | null
-  listings: Listing[]
+  // Shows by the acts Qloo says this audience loves most (and by the act itself),
+  // within 50 km. null when that lookup didn't run (no key, or a kind that doesn't tour).
+  crowd: number | null
+  self: number // of those, shows by the act being scanned
+  listings: Listing[] // same-crowd shows first, then genre shows
   source: 'ticketmaster' | 'demo' | 'none'
   window: { from: string; to: string }
 }
@@ -49,6 +54,7 @@ export type Verdict = 'underserved' | 'balanced' | 'crowded' | 'cold' | 'unliste
 export type MarketScore = {
   market: Market
   affinity: number // Qloo affinity of this entity's audience for the market, 0..1
+  percentile: number // share of all places Qloo maps that this market beats, 0..1
   index: number // affinity relative to the mean of the markets scanned (1 = average)
   supply: Supply
   whitespace: number // 0..100

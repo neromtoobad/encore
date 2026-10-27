@@ -2,7 +2,7 @@
 
 import { X, MapPin, Mic2, Handshake, Users, CalendarDays, ExternalLink } from 'lucide-react'
 import type { CityDetail, MarketScore } from './api.ts'
-import { VERDICT, fmtDate } from './labels.ts'
+import { VERDICT, fmtDate, topPct } from './labels.ts'
 
 type Props = { row: MarketScore; detail: CityDetail | null; error: string | null; onClose: () => void; openerLabel: string }
 
@@ -24,8 +24,8 @@ export default function CityPanel({ row, detail, error, onClose, openerLabel }: 
 
       <div className="stats">
         <Stat label="Whitespace" value={String(row.whitespace)} unit="/100" />
-        <Stat label="Demand" value={row.index.toFixed(1)} unit="× avg" />
-        <Stat label="Booked, 90 days" value={s.count === null ? '—' : String(s.count)} unit={s.count === null ? 'no data' : 'shows'} />
+        <Stat label="Demand" value={`${topPct(row.percentile)}%`} unit="top of places" />
+        <Stat label="Booked, 90 days" value={s.count === null ? '—' : String(s.count)} unit={s.count === null ? 'no data' : s.crowd ? `genre · ${s.crowd} same crowd` : 'genre shows'} />
         <Stat label="Per million" value={s.perMillion === null ? '—' : s.perMillion.toFixed(1)} unit="" />
       </div>
       <p className="why">{row.why}</p>
@@ -63,8 +63,13 @@ export default function CityPanel({ row, detail, error, onClose, openerLabel }: 
             </Section>
           )}
           <Section icon={<CalendarDays size={15} />} title="Already booked here">
+            {s.count !== null && (
+              <p className="muted small">
+                Next 90 days within 50 km. {s.crowd !== null && 'Tagged shows are by this act or the 15 acts its audience loves most, per Qloo; the rest are the matching genre.'}
+              </p>
+            )}
             {s.count === null ? (
-              <p className="muted">Ticketmaster has no listings for this market, so supply is unknown.</p>
+              <p className="muted">Ticketmaster has little or no listing data for this market, so supply is unknown.</p>
             ) : s.listings.length ? (
               <ul className="listings">
                 {s.listings.slice(0, 8).map((l, i) => {
@@ -72,7 +77,12 @@ export default function CityPanel({ row, detail, error, onClose, openerLabel }: 
                   return (
                     <li key={i}>
                       <span className="mini-date">{d.mon} {d.day}</span>
-                      <span className="grow">{l.name}{l.venue && <em> · {l.venue}</em>}{l.sample && <em className="tag-demo">demo</em>}</span>
+                      <span className="grow">
+                        {l.act && <b className={l.self ? 'act self' : 'act'}>{l.self ? 'You' : l.act}</b>}
+                        {l.name}
+                        {l.venue && <em> · {l.venue}</em>}
+                        {l.sample && <em className="tag-demo">demo</em>}
+                      </span>
                       {l.url && <a href={l.url} target="_blank" rel="noreferrer" aria-label="Open listing"><ExternalLink size={13} /></a>}
                     </li>
                   )

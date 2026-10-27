@@ -29,6 +29,9 @@ export const VERDICT: Record<Verdict, { label: string; color: string; hint: stri
   cold: { label: 'Cold', color: '#98a2b3', hint: 'Below-average affinity for this audience' },
 }
 
+// "4" for a market that beats 96% of the places Qloo maps.
+export const topPct = (percentile: number) => Math.max(1, Math.round((1 - percentile) * 100))
+
 export function fmtDate(iso: string) {
   const d = new Date(iso + 'T12:00:00Z')
   return { mon: d.toLocaleString('en', { month: 'short', timeZone: 'UTC' }).toUpperCase(), day: d.getUTCDate(), dow: d.toLocaleString('en', { weekday: 'short', timeZone: 'UTC' }) }

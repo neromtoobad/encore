@@ -168,10 +168,10 @@ export function demoAffinity(e: Entity, mk: Market) {
 }
 
 // How many comparable shows a market books in 90 days, per million people.
-const SUPPLY_RATE: Record<Kind, number> = { artist: 9, comedian: 6, author: 1.5, podcast: 1.2, brand: 0, film: 2, game: 0.8, chef: 0 }
+const SUPPLY_RATE: Record<Kind, number> = { artist: 9, comedian: 6, podcast: 1.2, author: 0, brand: 0, film: 0, game: 0, chef: 0 }
 
 export function demoSupply(e: Entity, mk: Market, window: Supply['window']): Supply {
-  if (!mk.ticketmaster || SUPPLY_RATE[e.kind] === 0) return { count: null, perMillion: null, listings: [], source: 'none', window }
+  if (!mk.ticketmaster || SUPPLY_RATE[e.kind] === 0) return { count: null, perMillion: null, listings: [], crowd: null, self: 0, source: 'none', window }
   const r = seeded(`supply|${e.kind}|${e.tags[0]?.name ?? ''}|${mk.id}`)
   const lean = (LEANS[mk.id] ?? []).filter((x) => e.tags.some((y) => y.name === x)).length
   const perMillion = SUPPLY_RATE[e.kind] * (0.25 + r() * 1.3 + lean * 0.35) * (mk.metroM > 8 ? 1.4 : 1)
@@ -182,7 +182,7 @@ export function demoSupply(e: Entity, mk: Market, window: Supply['window']): Sup
     venue: `${mk.name} venue`,
     sample: true,
   })).sort((a, b) => a.date.localeCompare(b.date))
-  return { count, perMillion: count / mk.metroM, listings, source: 'demo', window }
+  return { count, perMillion: count / mk.metroM, listings, crowd: null, self: 0, source: 'demo', window }
 }
 
 export function demoDetail(e: Entity, mk: Market, supply: Supply): CityDetail {

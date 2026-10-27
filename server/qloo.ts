@@ -3,17 +3,21 @@
 // functions answer from demo.ts and mark the result as demo.
 //
 // Where the demand numbers come from:
-//   market affinity  Insights, filter.type=urn:entity:destination, signalled by
-//                    the entity: how much its audience over-indexes on each city.
-//                    If destinations don't resolve, each city's heatmap is averaged.
+//   market affinity  One Insights heatmap (filter.type=urn:heatmap) over a polygon
+//                    covering every market, so all cities share one scale. Cells
+//                    are ~150 km geohashes; each market takes its nearest cell's
+//                    affinity and affinity_rank (the share of cells it beats).
+//                    Destinations can't be signalled by an artist (Qloo rejects
+//                    it), and a per-city heatmap rescales to 1 inside each city.
 //   neighbourhoods   Insights, filter.type=urn:heatmap inside one city.
 //   openers          Insights for the same entity type, signalled by the entity
-//                    and biased to the city with signal.location.query.
+//                    and biased to the city with signal.location.
 //   venues/partners  Insights for places (filtered by tag) and podcasts in the city.
 //   audience         Insights, filter.type=urn:demographics.
 
 import { cached, limiter, DAY } from './cache.ts'
 import { demoAffinity, demoDetail, demoEntity, demoRelated, demoSearch, qlooTypeOf } from './demo.ts'
+import { km } from './markets.ts'
 import type { CityDetail, Entity, Kind, Market, Pick, Spot, Supply, Tag } from './types.ts'
 
 const KEY = process.env.QLOO_API_KEY ?? ''
@@ -107,53 +111,45 @@ export async function related(e: Entity, n = 8): Promise<Pick[]> {
 
 // --- market affinity --------------------------------------------------------------
 
-async function destinationId(mk: Market): Promise<string | null> {
-  const r = await get('/search', { query: `${mk.name}, ${mk.country}`, types: 'urn:entity:destination', take: 3 })
-  const x = (r.results ?? []).find((y: Raw) => String(y.name).toLowerCase().startsWith(mk.name.toLowerCase())) ?? (r.results ?? [])[0]
-  return x ? String(x.entity_id ?? x.id) : null
-}
+// From Vancouver to Nairobi, Johannesburg to Glasgow: every market sits inside.
+const WORLD = 'POLYGON((-130 -40, 60 -40, 60 62, -130 62, -130 -40))'
 
-export async function marketAffinity(e: Entity, markets: Market[]): Promise<Map<string, number>> {
-  const out = new Map<string, number>()
+export type Demand = { affinity: number; percentile: number }
+
+export async function marketAffinity(e: Entity, markets: Market[]): Promise<Map<string, Demand>> {
+  const out = new Map<string, Demand>()
   if (e.source === 'demo') {
-    for (const mk of markets) out.set(mk.id, demoAffinity(e, mk))
+    for (const mk of markets) {
+      const a = demoAffinity(e, mk)
+      out.set(mk.id, { affinity: a, percentile: a })
+    }
     return out
   }
-  const ids = await Promise.all(markets.map((mk) => destinationId(mk).catch(() => null)))
-  const byDest = new Map<string, string>()
-  ids.forEach((id, i) => id && byDest.set(id, markets[i].id))
-  if (byDest.size) {
-    const dest = [...byDest.keys()]
-    for (let i = 0; i < dest.length; i += 50) {
-      const r = await insights({
-        'filter.type': 'urn:entity:destination',
-        'signal.interests.entities': e.id,
-        'filter.results.entities': dest.slice(i, i + 50).join(','),
-        take: 50,
-      }).catch(() => null)
-      for (const x of r ? entities(r) : []) {
-        const mid = byDest.get(String(x.entity_id ?? x.id))
-        if (mid && typeof x.query?.affinity === 'number') out.set(mid, x.query.affinity)
-      }
+  const r = await insights({ 'filter.type': 'urn:heatmap', 'filter.location': WORLD, 'output.heatmap.boundary': 'urn:geohash', 'signal.interests.entities': e.id })
+  const cells = ((r.results?.heatmap ?? []) as Raw[])
+    .map((p) => ({ lat: Number(p.location?.latitude), lng: Number(p.location?.longitude), affinity: Number(p.query?.affinity ?? 0), rank: Number(p.query?.affinity_rank ?? 0) }))
+    .filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng))
+  for (const mk of markets) {
+    let best: (typeof cells)[number] | null = null
+    let bestKm = 110 // a cell is ~150 km across; further than this isn't this city
+    for (const c of cells) {
+      const d = km(mk, c)
+      if (d < bestKm) [best, bestKm] = [c, d]
     }
+    if (best) out.set(mk.id, { affinity: best.affinity, percentile: best.rank })
   }
-  // Markets the destination route missed: average the top of the city's heatmap.
-  const missing = markets.filter((mk) => !out.has(mk.id))
-  await Promise.all(
-    missing.map(async (mk) => {
-      const heat = await cityHeat(e, mk).catch(() => [])
-      if (!heat.length) return
-      const top = heat.map((s) => s.affinity).sort((a, b) => b - a).slice(0, Math.max(3, Math.ceil(heat.length / 4)))
-      out.set(mk.id, top.reduce((a, b) => a + b, 0) / top.length)
-    }),
-  )
   return out
 }
 
 // --- one city -------------------------------------------------------------------------
 
+// Cities go to Qloo as coordinates, never names: a locality search for
+// "Washington" lands in Washington State, "Birmingham" can be Alabama.
+const point = (mk: Market) => `POINT(${mk.lng} ${mk.lat})`
+const inCity = (mk: Market) => ({ 'filter.location': point(mk), 'filter.location.radius': 35_000 })
+
 async function cityHeat(e: Entity, mk: Market): Promise<Spot[]> {
-  const r = await insights({ 'filter.type': 'urn:heatmap', 'filter.location.query': mk.name, 'signal.interests.entities': e.id })
+  const r = await insights({ 'filter.type': 'urn:heatmap', ...inCity(mk), 'signal.interests.entities': e.id })
   const pts: Raw[] = r.results?.heatmap ?? []
   return pts
     .map((p) => ({ lat: Number(p.location?.latitude), lng: Number(p.location?.longitude), geohash: p.location?.geohash, affinity: Number(p.query?.affinity ?? 0) }))
@@ -161,15 +157,16 @@ async function cityHeat(e: Entity, mk: Market): Promise<Spot[]> {
 }
 
 // Tag searches for the kind of room each kind of act plays, and for partners.
-const VENUE_TAG: Record<Kind, string> = {
-  artist: 'music venue',
-  comedian: 'comedy club',
-  author: 'bookstore',
-  podcast: 'theater',
-  brand: 'boutique',
-  film: 'movie theater',
-  game: 'arcade',
-  chef: 'restaurant',
+// The first tag is tried first; the rest top the list up when it comes back short.
+const VENUE_TAGS: Record<Kind, string[]> = {
+  artist: ['music venue', 'concert hall', 'nightclub'],
+  comedian: ['comedy club', 'theater'],
+  author: ['bookstore', 'library'],
+  podcast: ['theater', 'music venue'],
+  brand: ['boutique', 'art gallery'],
+  film: ['movie theater'],
+  game: ['arcade', 'bar'],
+  chef: ['restaurant'],
 }
 
 async function tagId(query: string): Promise<string | null> {
@@ -184,11 +181,31 @@ async function places(e: Entity, mk: Market, tagQuery: string, n: number): Promi
   const r = await insights({
     'filter.type': 'urn:entity:place',
     'signal.interests.entities': e.id,
-    'filter.location.query': mk.name,
+    ...inCity(mk),
     'filter.tags': tag ?? undefined,
     take: n,
   })
   return entities(r).map(toPick)
+}
+
+async function venuesFor(e: Entity, mk: Market, n: number): Promise<Pick[]> {
+  const out: Pick[] = []
+  for (const tag of VENUE_TAGS[e.kind]) {
+    if (out.length >= 4) break
+    for (const p of await places(e, mk, tag, n).catch(() => [])) if (!out.some((x) => x.id === p.id)) out.push(p)
+  }
+  return out.slice(0, n)
+}
+
+// Acts the same fans love that are no bigger than the act itself: a support
+// slot, not a co-headliner. Widens if the cap leaves too few. (Weighting this to
+// the city pulled in local acts from other genres, so it isn't.)
+async function openersFor(e: Entity): Promise<Pick[]> {
+  const base = { 'filter.type': e.qlooType, 'signal.interests.entities': e.id, take: 8 }
+  const cap = e.popularity !== undefined ? Math.min(0.97, e.popularity) : undefined
+  let r = cap !== undefined ? await insights({ ...base, 'filter.popularity.max': cap.toFixed(3) }).catch(() => null) : null
+  if (!r || entities(r).length < 3) r = await insights(base)
+  return entities(r).map(toPick).filter((p) => p.id !== e.id).slice(0, 5)
 }
 
 async function audience(e: Entity): Promise<CityDetail['audience']> {
@@ -211,9 +228,9 @@ export async function cityDetail(e: Entity, mk: Market, supply: Supply): Promise
   const soft = <T>(p: Promise<T>, fallback: T) => p.catch((err) => (console.warn(`[qloo] ${mk.id}: ${(err as Error).message}`), fallback))
   const [heat, venues, openers, podcasts, food, aud] = await Promise.all([
     soft(cityHeat(e, mk), []),
-    soft(places(e, mk, VENUE_TAG[e.kind], 6), []),
-    soft(insights({ 'filter.type': e.qlooType, 'signal.interests.entities': e.id, 'signal.location.query': mk.name, take: 7 }).then((r) => entities(r).map(toPick).filter((p) => p.id !== e.id).slice(0, 5)), []),
-    soft(insights({ 'filter.type': 'urn:entity:podcast', 'signal.interests.entities': e.id, 'signal.location.query': mk.name, take: 3 }).then((r) => entities(r).map((x) => ({ ...toPick(x), blurb: 'Podcast' }))), []),
+    soft(venuesFor(e, mk, 6), []),
+    soft(openersFor(e), []),
+    soft(insights({ 'filter.type': 'urn:entity:podcast', 'signal.interests.entities': e.id, 'signal.location': point(mk), take: 3 }).then((r) => entities(r).map((x) => ({ ...toPick(x), blurb: 'Podcast' }))), []),
     soft(places(e, mk, e.kind === 'chef' ? 'bar' : 'restaurant', 3), []),
     soft(audience(e), null),
   ])

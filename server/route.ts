@@ -1,6 +1,6 @@
 // Orders chosen markets into a run and gives each a date. Nearest neighbour
 // from the first city, so the run never doubles back across an ocean more than
-// it has to; gaps grow with distance; a date already taken by a comparable show
+// it has to; gaps grow with distance; a date taken by an act this audience loves
 // in that city moves to the next free day.
 
 import { addDays } from './demo.ts'
@@ -31,13 +31,15 @@ export function route(markets: Market[], start: string, supplies: Map<string, Su
     const prev = order[i - 1]
     const dist = prev ? km(prev, mk) : 0
     if (prev) date = addDays(date, gapDays(dist) + (i % restEvery === 0 ? 1 : 0))
-    const taken = new Set((supplies.get(mk.id)?.listings ?? []).filter((l) => !l.sample).map((l) => l.date))
+    // Only shows by acts this audience loves block a date; genre shows run most nights.
+    const clash = new Map((supplies.get(mk.id)?.listings ?? []).filter((l) => l.act && !l.sample).map((l) => [l.date, l.act as string]))
     let d = date
     let moved: string | undefined
-    for (let tries = 0; taken.has(d) && tries < 3; tries++) {
-      moved = `${d} already has a comparable show booked`
+    for (let tries = 0; clash.has(d) && tries < 3; tries++) {
+      moved = `${d} clashes with ${clash.get(d)}`
       d = addDays(d, 1)
     }
+    if (moved) moved = `Moved: ${moved}`
     date = d
     stops.push({ market: mk, date: d, travelKm: Math.round(dist), moved })
   })

@@ -4,7 +4,7 @@
 import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import type { CityDetail, MarketScore } from './api.ts'
-import { VERDICT } from './labels.ts'
+import { VERDICT, topPct } from './labels.ts'
 
 type Props = {
   markets: MarketScore[]
@@ -49,13 +49,13 @@ export default function MarketMap({ markets, selected, detail, route, onSelect }
       const v = VERDICT[r.verdict]
       const on = r.market.id === selected
       const c = L.circleMarker([r.market.lat, r.market.lng], {
-        radius: 5 + Math.max(0, r.index - 0.5) * 9,
+        radius: 4 + Math.max(0, r.percentile - 0.5) * 22,
         color: on ? '#14161c' : '#ffffff',
         weight: on ? 3 : 1.5,
         fillColor: v.color,
         fillOpacity: r.verdict === 'cold' ? 0.35 : 0.85,
       })
-      c.bindTooltip(`<b>${r.market.name}</b> · ${v.label}<br/>Whitespace ${r.whitespace} · demand ${r.index.toFixed(1)}×`, { direction: 'top', offset: [0, -6] })
+      c.bindTooltip(`<b>${r.market.name}</b> · ${v.label}<br/>Whitespace ${r.whitespace} · top ${topPct(r.percentile)}% for demand`, { direction: 'top', offset: [0, -6] })
       c.on('click', () => select.current(r.market.id))
       c.addTo(g)
     }
@@ -74,15 +74,21 @@ export default function MarketMap({ markets, selected, detail, route, onSelect }
     if (!g || !map.current) return
     g.clearLayers()
     if (!detail || detail.market.id !== selected) return
-    const max = Math.max(0.01, ...detail.heat.map((s) => s.affinity))
-    for (const s of detail.heat) {
-      const k = s.affinity / max
-      L.circle([s.lat, s.lng], { radius: 500 + k * 900, stroke: false, fillColor: k > 0.66 ? '#ff5a36' : k > 0.33 ? '#ffb020' : '#7c8db5', fillOpacity: 0.12 + k * 0.4, interactive: false }).addTo(g)
+    // Qloo returns ~1,300 cells for a big city; the hottest 400 tell the story.
+    const cells = [...detail.heat].sort((a, b) => b.affinity - a.affinity).slice(0, 400)
+    const max = Math.max(0.01, cells[0]?.affinity ?? 0)
+    const min = cells[cells.length - 1]?.affinity ?? 0
+    for (const s of [...cells].reverse()) {
+      const k = max > min ? (s.affinity - min) / (max - min) : 1
+      L.circle([s.lat, s.lng], { radius: 350 + k * 650, stroke: false, fillColor: k > 0.66 ? '#ff5a36' : k > 0.33 ? '#ffb020' : '#7c8db5', fillOpacity: 0.1 + k * 0.45, interactive: false }).addTo(g)
     }
-    // Keep the heat clear of the city drawer on the right (or bottom, on phones).
+    // Frame the hottest quarter, clear of the city drawer on the right (or bottom, on phones).
     const phone = window.innerWidth < 860
-    const pts = detail.heat.length ? detail.heat.map((s) => [s.lat, s.lng] as [number, number]) : [[detail.market.lat, detail.market.lng] as [number, number]]
-    map.current.flyToBounds(L.latLngBounds(pts).pad(0.15), { paddingTopLeft: [20, 20], paddingBottomRight: phone ? [20, 20] : [430, 20], maxZoom: 12, duration: 0.8 })
+    const hot = cells.slice(0, Math.max(8, Math.ceil(cells.length / 4)))
+    const pts = hot.length ? hot.map((s) => [s.lat, s.lng] as [number, number]) : [[detail.market.lat, detail.market.lng] as [number, number]]
+    const w = map.current.getSize().x
+    const drawer = phone ? 0 : Math.min(430, Math.max(0, w - 260)) // leave at least 240 px of map visible
+    map.current.flyToBounds(L.latLngBounds(pts).pad(0.1), { paddingTopLeft: [20, 20], paddingBottomRight: [drawer + 20, 20], maxZoom: 12, duration: 0.8 })
   }, [detail, selected])
 
   // Planned route.

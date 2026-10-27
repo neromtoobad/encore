@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, Loader2, Route, ChevronRight, CircleCheck, CircleDot } from 'lucide-react'
 import { getCity, getScan, getStatus, searchEntities, streamPlan, type CityDetail, type Entity, type Kind, type Plan, type Region, type Scan, type Status } from './api.ts'
-import { KINDS, REGIONS, VERDICT, kindLabel } from './labels.ts'
+import { KINDS, REGIONS, VERDICT, kindLabel, topPct } from './labels.ts'
 import MarketMap from './MarketMap.tsx'
 import CityPanel from './CityPanel.tsx'
 import PlanView from './PlanView.tsx'
@@ -287,7 +287,7 @@ export default function App() {
                             <span className="grow">
                               <b>{r.market.name}</b>
                               <small>
-                                Demand {r.index.toFixed(1)}× · {r.supply.count === null ? 'no listings data' : `${r.supply.count} booked`}
+                                Top {topPct(r.percentile)}% for demand · {r.supply.count === null ? 'no listings data' : `${r.supply.count} booked`}
                               </small>
                               <span className="ws-bar"><i style={{ width: `${r.whitespace}%`, background: VERDICT[r.verdict].color }} /></span>
                             </span>

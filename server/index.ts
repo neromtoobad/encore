@@ -16,10 +16,10 @@ loadEnv(path.join(ROOT, '.env'))
 
 // Imported after the env file loads: these modules read their keys at import time.
 const { search, entity, cityDetail, qlooLive } = await import('./qloo.ts')
-const { supply, ticketmasterLive } = await import('./ticketmaster.ts')
+const { supply, ticketmasterLive, warmCoverage } = await import('./ticketmaster.ts')
 const { scan } = await import('./score.ts')
 const { plan, agentLive } = await import('./agent.ts')
-const { marketById } = await import('./markets.ts')
+const { marketById, MARKETS } = await import('./markets.ts')
 type Kind = import('./types.ts').Kind
 type Region = import('./types.ts').Region
 type Scan = import('./types.ts').Scan
@@ -161,4 +161,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Encore on http://localhost:${PORT}  (qloo: ${qlooLive() ? 'live' : 'demo'}, ticketmaster: ${ticketmasterLive() ? 'live' : 'demo'}, agent: ${agentLive() ? 'claude' : 'rules'})`)
+  warmCoverage(MARKETS).catch((err) => console.warn('[supply] coverage warm-up failed:', (err as Error).message))
 })

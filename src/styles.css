@@ -149,7 +149,9 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .listings li { display: flex; gap: 10px; align-items: center; font-size: 13px; }
 .listings em { font-style: normal; color: var(--muted); }
 .listings a { color: var(--muted); }
-.mini-date { font: 800 13px var(--display); background: var(--ink); color: #fff; border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
+.act { display: inline-block; font-size: 11px; font-weight: 700; color: var(--ink-2); background: var(--line-2); border-radius: 5px; padding: 0 5px; margin-right: 6px; }
+.act.self { background: var(--accent); color: #fff; }
+.mini-date {font: 800 13px var(--display); background: var(--ink); color: #fff; border-radius: 6px; padding: 2px 6px; white-space: nowrap; }
 .tag-demo { margin-left: 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #a06a00 !important; }
 
 /* map pins */

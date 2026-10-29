@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=Inter:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=block" rel="stylesheet" />
+<style>
+  :root { --ink:#14161c; --paper:#f6f5f0; --coral:#ff5a36; --gold:#ffb020; --good:#12936a; --crowd:#e0472b; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; }
+  body { font-family: Inter, sans-serif; color: var(--paper); background: radial-gradient(900px 600px at 78% 110%, #ff5a3633, transparent 70%), radial-gradient(700px 500px at 10% -10%, #ffb0201c, transparent 70%), var(--ink); position: relative; }
+  body::after { content: ""; position: absolute; inset: 0; opacity: .35; background-image: radial-gradient(#ffffff10 1px, transparent 1px); background-size: 4px 4px; pointer-events: none; }
+  .disp { font-family: 'Big Shoulders Display', sans-serif; font-weight: 900; text-transform: uppercase; line-height: .88; }
+  .mono { font-family: 'IBM Plex Mono', monospace; text-transform: uppercase; letter-spacing: .1em; }
+
+  .left { position: absolute; left: 80px; top: 92px; width: 600px; }
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .brand img { width: 96px; height: 96px; }
+  .brand .word { font-size: 150px; }
+  .tag { margin-top: 26px; font: 800 64px/0.98 'Big Shoulders Display'; text-transform: uppercase; color: #fff; }
+  .tag em { font-style: normal; color: var(--coral); }
+  .points { margin-top: 34px; display: flex; flex-direction: column; gap: 14px; }
+  .points div { display: flex; gap: 14px; align-items: baseline; font: 600 25px/1.3 Inter; color: #e3e5ea; }
+  .points b { flex: none; font: 600 17px 'IBM Plex Mono'; letter-spacing: .08em; color: var(--ink); background: var(--gold); border-radius: 6px; padding: 3px 8px; transform: translateY(-3px); }
+  .foot { position: absolute; left: 80px; bottom: 62px; display: flex; gap: 22px; align-items: center; font: 600 22px 'IBM Plex Mono'; letter-spacing: .04em; }
+  .foot .url { color: #fff; background: #ffffff12; border: 2px solid #ffffff22; border-radius: 12px; padding: 10px 16px; }
+  .foot .hk { color: #9aa0ad; text-transform: uppercase; letter-spacing: .12em; font-size: 18px; }
+
+  .win { position: absolute; left: 720px; top: 110px; width: 1010px; height: 694px; border-radius: 22px; overflow: hidden; background: var(--paper); box-shadow: 0 60px 120px -50px #000, 0 0 0 2px #ffffff1f; transform: perspective(2200px) rotateY(-9deg) rotateX(2deg); transform-origin: 0 50%; }
+  .win .bar { height: 38px; background: #0b0c10; display: flex; gap: 10px; align-items: center; padding: 0 16px; font: 500 14px 'IBM Plex Mono'; color: #9aa0ad; }
+  .win .bar i { width: 10px; height: 10px; border-radius: 50%; background: #ffffff26; display: inline-block; }
+  .win .bar .live { margin-left: auto; color: var(--gold); }
+  .win .bar .live::before { content: "● "; color: var(--coral); }
+  .win .shot { position: absolute; left: 0; right: 0; top: 38px; bottom: 0; background: url(2-scan.jpg) 0 0 / 1010px auto no-repeat; }
+
+  .chip { position: absolute; background: #0b0c10f2; border-radius: 16px; padding: 16px 20px; box-shadow: 0 30px 60px -24px #000; border-left: 7px solid var(--good); }
+  .chip .k { font: 600 16px 'IBM Plex Mono'; letter-spacing: .1em; color: #9aa0ad; text-transform: uppercase; }
+  .chip .v { font: 900 44px/1 'Big Shoulders Display'; text-transform: uppercase; margin-top: 6px; }
+  .chip .s { font: 600 18px 'IBM Plex Mono'; color: var(--good); margin-top: 6px; letter-spacing: .06em; }
+  .c1 { left: 640px; top: 560px; }
+  .crowd { position: absolute; right: 52px; top: 430px; width: 500px; border-radius: 18px; overflow: hidden; background: #fff; box-shadow: 0 50px 90px -30px #000, 0 0 0 2px #ffffff22; }
+  .crowd .h { background: #0b0c10; color: #fff; font: 600 16px 'IBM Plex Mono'; letter-spacing: .1em; text-transform: uppercase; padding: 12px 16px; border-left: 7px solid var(--crowd); }
+  .crowd .h em { font-style: normal; color: var(--crowd); }
+  .crowd .img { display: block; width: 100%; }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="brand"><img src="favicon.svg" alt="" /><span class="word disp">Encore</span></div>
+    <div class="tag">Find the crowd<br>that's <em>waiting for you.</em></div>
+    <div class="points">
+      <div><b>QLOO</b>Where your audience over-indexes, across 42 cities</div>
+      <div><b>TICKETMASTER</b>What's already booked there, by acts your fans love</div>
+      <div><b>CLAUDE</b>Plans the run and writes the outreach</div>
+    </div>
+  </div>
+  <div class="win"><div class="bar"><i></i><i></i><i></i><span>encore.nerom.site</span><span class="live">LIVE · Qloo + Ticketmaster + Claude</span></div><div class="shot"></div></div>
+  <div class="chip c1"><div class="k">Asake · Washington</div><div class="v">Top 14% for demand</div><div class="s">UNDERSERVED</div></div>
+  <div class="crowd"><div class="h">London · <em>crowded</em> · same-crowd shows</div><img class="img" src="london-booked.jpg" alt="" /></div>
+  <div class="foot"><span class="url">encore.nerom.site</span><span class="hk">Qloo Agentic Hackathon 2026</span></div>
+</body>
+</html>
